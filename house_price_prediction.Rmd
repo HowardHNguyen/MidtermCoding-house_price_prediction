@@ -1,0 +1,159 @@
+---
+title: "CS510-Midterm Coding Project"
+author: "Howard Nguyen"
+date: "10/11/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(ggplot2)
+```
+
+# Correlation Analysis
+## Loading dataset
+### This code is to predict housing prices
+### dataset from zillow datasets: 21,613 observations and 21 varialbes
+
+```{r cars}
+data <- read.csv("housing_data.csv", header = TRUE)
+head(data)
+```
+
+## Create scatter plots with house price data and see what kind of relationship we can quantify using the Pearson correlation.
+### Dependent variable: price
+### Independent variable: sqft_living
+### Create vectors with Y-dependent and X-independent
+
+```{r pressure, echo=FALSE}
+x <- data$sqft_living;
+y <- data$price;
+```
+
+## Scatterplot
+
+```{r}
+plot(x,y, main="House price vs. Living space", xlab="Living space (sqft)", 
+     ylab="House price ($)", pch=18, cex=0.3, col="blue")
+# Add a fit line to show the relationship direction
+abline(lm(y~x))  # regression line (y~x)
+lines(lowess(x,y), col="green")  # lowess line (x,y)
+```
+### The plot shows the scatter plot bettwen Price and Living Space. The curved line is a locally smoothed fitted line. It can be seen that there is a linear relationship among the variables.
+
+## Report the correlation coefficient of this relation
+
+```{r}
+cat("The correlation among House Price and Living Space is ", cor(x,y))
+```
+
+## From the above plot, we can observe as follow:
+### The relationship is in a positive direction, so on average the house price increases with the size of the store. This is an intuitive relationship, hence we can draw causality. The bigger the living space, the better the house, which means it’s more costly.
+### The correlation is 0.70. This is a pretty strong relationship on a linear scale.
+### The curved line is a LOWESS (Locally Weighted Scatterplot Smoothing) plot, which shows that it is not very different from the linear regression line. Hence, the linear relationship is worth exploring for a model.
+
+# Simple Linear Regression Analysis
+## Linear model using: Ordinary Least Square (OLS) technique, the lm()
+### Depenent variable: House price
+### Independent variable: Living space
+### Further our correlation analysis showed that these two variables have a positive linear relation and hence we will expect a positive sign to the parameter estimates of Living Space
+
+```{r}
+# fit the model
+fitted_model <- lm(y~x)
+# display yhe summary of the model
+summary(fitted_model)
+```
+### The estimated equation in this case is:
+### y = 43580.743 + (280.624)x
+### where y is House Price and x is Living Space. This implies for a unit increase in living space, the house price will be increased by $280.624.
+
+## Next, to see how the model fits the actual value, this is done by plotting actual values against the predicted values:
+
+```{r}
+res <- stack(data.frame(Observed=y, Predicted=fitted(fitted_model)))
+res <- cbind(res, x=rep(x, 2))
+```
+
+### Plot using lattice xyplot function
+
+```{r}
+library("lattice")
+xyplot(values ~x, data=res, group=ind, auto.key=TRUE)
+```
+#### The above plot shows the fitted values with the actual values, we can see that the plot shows the linear relationship predicted by the model, stacked with the scatter plot of the original.
+
+
+## Now, this is a model with only one explanatory variable (sqft_living), but there are other variables show significant relationship with Price.  The Regression framwork allow us to add multiple variable or independent variables to the regression analysis.
+
+# Multiple Linear Regression
+## Will use these variables: bedrooms, bathrooms, sqft_living, waterfront, view, condition, grade, and yr_built
+
+```{r}
+lm_model <- data[,c("id","price","bedrooms","bathrooms","sqft_living",
+                    "waterfront","view","condition","grade","yr_built")]
+```
+
+### Check in for NA values
+
+```{r}
+sapply(lm_model, function(x) sum(is.na(x)))
+```
+
+### In the case of any NA value, I use na.omit to remove these NA values off from the dataset for analysis
+
+```{r}
+lm_model <- na.omit(lm_model)
+rownames(lm_model) <- NULL
+```
+
+### I need to factor those categorical variables: grade and condition
+
+```{r}
+lm_model$grade <- factor(lm_model$grade)
+lm_model$condition <- factor(lm_model$condition)
+```
+
+### Now, the dataset is clean, I can run the lm() function to fit the multiple linear regression model.
+
+```{r}
+fitted_model_multiple <- lm(price ~sqft_living + waterfront + bedrooms + 
+                              bathrooms + grade + condition, data = lm_model)
+summary(fitted_model_multiple)
+```
+### From the result, we can see that sqft_living, waterfront and bedrooms are significant at 95% confidence level, i.e., statistically different from zero. While many grades and conditions are insignificant, hence statistically they are equal zero. The higher gradings (11,12,13) are significant but not the lower ones.  I will drop the condition and will re-estimate to keep only significant variables.
+
+### Now, to see the actual vs. predicted values for this model by plotting them after ordering the series by price.
+
+### Get the fitted values and create a data frame of actual and predicted get predicted values
+
+```{r}
+actual_predicted <- as.data.frame(cbind(lm_model$id,lm_model$price,
+                                        fitted(fitted_model_multiple)))
+names(actual_predicted) <- c("id","Actual","Predicted")
+```
+
+### Order the house by increasing Actual price
+
+```{r}
+actual_predicted <- actual_predicted[order(actual_predicted$Actual),]
+```
+
+### Find the absolute residual and then take mean of that
+
+```{r}
+ggplot(actual_predicted,aes(x=1:nrow(lm_model),color=Series)) +
+  geom_line(data=actual_predicted, aes(x=1:nrow(lm_model), 
+                                       y=Actual, color="Actual")) +
+  geom_line(data=actual_predicted, aes(x=1:nrow(lm_model), 
+                                       y=Predicted, color="Predicted", 
+                                       alpha=0.3)) +
+  xlab("Number of Houses") + ylab("House Sale Price")
+```
+
+## The plot shows that the model closely follows the actual prices. There are a few outliers on Actual values which the model is not able to predict, and that's fine as this model is not influenced by these small outliers.
+
+### Thank you!
