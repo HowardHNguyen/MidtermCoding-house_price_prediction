@@ -23,6 +23,11 @@ data <- read.csv("housing_data.csv", header = TRUE)
 head(data)
 ```
 
+## Exploring the dataset
+```{r}
+str(data)
+```
+
 ## Create scatter plots with house price data and see what kind of relationship we can quantify using the Pearson correlation.
 ### Dependent variable: price
 ### Independent variable: sqft_living
